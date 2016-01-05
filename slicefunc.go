@@ -35,6 +35,10 @@ func Join(f func([]func()), t interface{}, fs ...interface{}) interface{} {
 	return r.Interface()
 }
 
+func CallArgs(f interface{}, args ...interface{}) {
+	Call(f, Injs(args...))
+}
+
 func Call(f interface{}, inj inject.Injector) {
 	vs := reflect.ValueOf(f)
 	vt := vs.Type()
