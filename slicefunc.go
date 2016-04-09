@@ -6,7 +6,15 @@ import (
 	"github.com/codegangsta/inject"
 )
 
-func Join(f func([]func()), t interface{}, fs ...interface{}) interface{} {
+func Join(t interface{}, fs ...interface{}) interface{} {
+	return JoinBy(func(fa []func()) {
+		for _, v := range fa {
+			v()
+		}
+	}, t, fs...)
+}
+
+func JoinBy(f func([]func()), t interface{}, fs ...interface{}) interface{} {
 	if len(fs) == 0 {
 		return nil
 	}

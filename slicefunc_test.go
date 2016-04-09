@@ -5,7 +5,7 @@ import (
 )
 
 func Test_all(t *testing.T) {
-	Call(Join(func(fa []func()) {
+	nf1 := JoinBy(func(fa []func()) {
 		fa[3]()
 		fa[2]()
 		fa[1]()
@@ -23,5 +23,12 @@ func Test_all(t *testing.T) {
 	}, func(i int) {
 		t.Log(i)
 
-	}), Injs(100))
+	})
+	Call(nf1, Injs(100))
+
+	nf2 := Join(nf1, nf1, func() {
+		t.Log("end")
+	})
+
+	Call(nf2, Injs(100))
 }
