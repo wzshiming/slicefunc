@@ -6,59 +6,81 @@ import (
 	"github.com/codegangsta/inject"
 )
 
-func Join(t interface{}, fs ...interface{}) interface{} {
-	return JoinBy(func(fa []func()) {
-		for _, v := range fa {
-			v()
-		}
-	}, t, fs...)
+// 默认采用第一个的参数
+func Join(fs ...interface{}) interface{} {
+	return JoinBy(fs[0], fs...)
 }
 
-func JoinBy(f func([]func()), t interface{}, fs ...interface{}) interface{} {
-	if len(fs) == 0 {
+// 连接函数 返回error 结束 下一次传递
+func JoinBy(t interface{}, fs ...interface{}) interface{} {
+
+	val := reflect.ValueOf(t)
+	if val.Kind() != reflect.Func {
 		return nil
 	}
-	if len(fs) == 1 {
-		return fs[0]
+
+	for k, v := range fs {
+		c := toCaller(v)
+		if c == nil {
+			return nil
+		}
+		fs[k] = c
 	}
-	typ := reflect.ValueOf(t)
-	if typ.Kind() != reflect.Func {
-		return nil
-	}
-	r := reflect.MakeFunc(typ.Type(), func(args []reflect.Value) (results []reflect.Value) {
+
+	typ := val.Type()
+	r := reflect.MakeFunc(typ, func(args []reflect.Value) (results []reflect.Value) {
 		inj := inject.New()
 		for _, v := range args {
-			inj.Map(v.Interface())
+			inj.Set(v.Type(), v)
 		}
-		funcs := []func(){}
-		for _, v := range fs {
-			tt := v
-			funcs = append(funcs, func() {
-				Call(tt, inj)
-			})
+		inj = sliceFunc(inj, fs)
+		for i := 0; i != typ.NumOut(); i++ {
+			results = append(results, inj.Get(typ.Out(i)))
 		}
-		f(funcs)
 		return
 	})
 	return r.Interface()
 }
 
-func CallArgs(f interface{}, args ...interface{}) {
-	Call(f, Injs(args...))
+func sliceFunc(inj inject.Injector, fs []interface{}) inject.Injector {
+	for _, v := range fs {
+		data, err := Call(v, inj)
+		if err != nil {
+			inj.Map(err)
+			return inj
+		}
+		for _, v := range data {
+			inj.Set(v.Type(), v)
+			_, ok := v.Interface().(error)
+			if ok {
+				return inj
+			}
+		}
+	}
+	return inj
 }
 
-func Call(f interface{}, inj inject.Injector) {
-	vs := reflect.ValueOf(f)
-	vt := vs.Type()
-	args0 := []reflect.Value{}
-	for i := 0; i != vt.NumIn(); i++ {
-		arg := inj.Get(vt.In(i))
-		if !arg.IsValid() {
-			arg = reflect.New(vt.In(i)).Elem()
-		}
-		args0 = append(args0, arg)
+func toCaller(f interface{}) interface{} {
+	val := reflect.ValueOf(f)
+	for val.Kind() == reflect.Ptr {
+		val = val.Elem()
 	}
-	vs.Call(args0)
+	if val.Kind() == reflect.Func {
+		return f
+	}
+	cal := val.MethodByName("Call")
+	if !cal.IsValid() {
+		return nil
+	}
+	return cal.Interface()
+}
+
+func CallArgs(f interface{}, args ...interface{}) ([]reflect.Value, error) {
+	return Call(f, Injs(args...))
+}
+
+func Call(f interface{}, inj inject.Injector) ([]reflect.Value, error) {
+	return inj.Invoke(f)
 }
 
 func Injs(args ...interface{}) inject.Injector {

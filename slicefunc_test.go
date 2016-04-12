@@ -1,34 +1,30 @@
 package slicefunc
 
 import (
+	"fmt"
 	"testing"
 )
 
 func Test_all(t *testing.T) {
-	nf1 := JoinBy(func(fa []func()) {
-		fa[3]()
-		fa[2]()
-		fa[1]()
-		fa[0]()
-		fa[0]()
-		fa[1]()
-		fa[2]()
-		fa[3]()
-	}, func(int) {}, func() {
-		t.Log(1)
-	}, func() {
-		t.Log(2)
-	}, func() {
-		t.Log(3)
-	}, func(i int) {
-		t.Log(i)
 
-	})
-	Call(nf1, Injs(100))
+	nf2 := Join(A1, A2, A{}, A{})
+	f, _ := nf2.(func(i int) string)
+	f(100)
+	//Call(nf2, Injs(100))
+}
 
-	nf2 := Join(nf1, nf1, func() {
-		t.Log("end")
-	})
+type A struct {
+}
 
-	Call(nf2, Injs(100))
+func (A) Call(s string) error {
+	fmt.Printf(s)
+	return fmt.Errorf("end")
+}
+
+func A1(i int) string {
+	return fmt.Sprint(i + 10)
+}
+
+func A2(i int, s string) (int, string) {
+	return i + 50, fmt.Sprint(i) + " " + s
 }
