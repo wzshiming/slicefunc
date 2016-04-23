@@ -6,6 +6,8 @@ import (
 	"github.com/codegangsta/inject"
 )
 
+type Injector inject.Injector
+
 // 默认采用第一个的参数
 func Join(fs ...interface{}) interface{} {
 	return JoinBy(fs[0], fs...)
@@ -33,7 +35,7 @@ func JoinBy(t interface{}, fs ...interface{}) interface{} {
 		for _, v := range args {
 			inj.Set(v.Type(), v)
 		}
-		inj = sliceFunc(inj, fs)
+		inj = SliceFunc(inj, fs)
 		for i := 0; i != typ.NumOut(); i++ {
 			results = append(results, inj.Get(typ.Out(i)))
 		}
@@ -42,7 +44,7 @@ func JoinBy(t interface{}, fs ...interface{}) interface{} {
 	return r.Interface()
 }
 
-func sliceFunc(inj inject.Injector, fs []interface{}) inject.Injector {
+func SliceFunc(inj Injector, fs []interface{}) Injector {
 	for _, v := range fs {
 		data, err := Call(v, inj)
 		if err != nil {
@@ -51,9 +53,11 @@ func sliceFunc(inj inject.Injector, fs []interface{}) inject.Injector {
 		}
 		for _, v := range data {
 			inj.Set(v.Type(), v)
-			_, ok := v.Interface().(error)
-			if ok {
+			switch v.Interface().(type) {
+			case error:
 				return inj
+			case Injector:
+				inj = v.Interface().(Injector)
 			}
 		}
 	}
@@ -79,11 +83,12 @@ func CallArgs(f interface{}, args ...interface{}) ([]reflect.Value, error) {
 	return Call(f, Injs(args...))
 }
 
-func Call(f interface{}, inj inject.Injector) ([]reflect.Value, error) {
+func Call(f interface{}, inj Injector) ([]reflect.Value, error) {
+	inj.Map(inj)
 	return inj.Invoke(f)
 }
 
-func Injs(args ...interface{}) inject.Injector {
+func Injs(args ...interface{}) Injector {
 	inj := inject.New()
 	for _, v := range args {
 		inj.Map(v)
